@@ -21,17 +21,17 @@ from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import jaccard_similarity_score
 from sklearn.metrics import f1_score
 # help_functions.py
-from lib.help_functions import *
+from help_functions import *
 # extract_patches.py
-from lib.extract_patches import recompone
-from lib.extract_patches import recompone_overlap
-from lib.extract_patches import paint_border
-from lib.extract_patches import kill_border
-from lib.extract_patches import pred_only_FOV
-from lib.extract_patches import get_data_testing
-from lib.extract_patches import get_data_testing_overlap
+from extract_patches import recompone
+from extract_patches import recompone_overlap
+from extract_patches import paint_border
+from extract_patches import kill_border
+from extract_patches import pred_only_FOV
+from extract_patches import get_data_testing
+from extract_patches import get_data_testing_overlap
 # pre_processing.py
-from lib.pre_processing import my_PreProc
+from pre_processing import my_PreProc
 
 
 #========= CONFIG FILE TO READ FROM =======
