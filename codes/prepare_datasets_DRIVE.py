@@ -66,7 +66,7 @@ def get_datasets(imgs_dir, groundTruth_dir, borderMasks_dir, train_test="null"):
     print("imgs min: " +str(np.min(imgs)))
     assert(np.max(groundTruth)==255 and np.max(border_masks)==255)
     assert(np.min(groundTruth)==0 and np.min(border_masks)==0)
-    print("ground truth and border masks are correctly withih pixel value range 0-255 (black-white)")
+    print("ground truth and border masks are correctly within pixel value range 0-255 (black-white)")
     #reshaping for my standard tensors
     imgs = np.transpose(imgs,(0,3,1,2))
     assert(imgs.shape == (Nimgs,channels,height,width))
@@ -76,18 +76,18 @@ def get_datasets(imgs_dir, groundTruth_dir, borderMasks_dir, train_test="null"):
     assert(border_masks.shape == (Nimgs,1,height,width))
     return imgs, groundTruth, border_masks
 
-#创建文件夹，用于存放数据集文件
+#===== 创建文件夹，用于存放数据集文件 =====
 if not os.path.exists(dataset_path):
     os.makedirs(dataset_path)
 
-#getting the training datasets
+#========= getting the training datasets =========
 imgs_train, groundTruth_train, border_masks_train = get_datasets(original_imgs_train, groundTruth_imgs_train, borderMasks_imgs_train, "train")
 print("saving train datasets")
 write_hdf5(imgs_train, dataset_path + "DRIVE_dataset_imgs_train.hdf5")
 write_hdf5(groundTruth_train, dataset_path + "DRIVE_dataset_groundTruth_train.hdf5")
 write_hdf5(border_masks_train, dataset_path + "DRIVE_dataset_borderMasks_train.hdf5")
 
-#getting the testing datasets
+#============ getting the testing datasets ===========
 imgs_test, groundTruth_test, border_masks_test = get_datasets(original_imgs_test,groundTruth_imgs_test,borderMasks_imgs_test,"test")
 print("saving test datasets")
 write_hdf5(imgs_test, dataset_path + "DRIVE_dataset_imgs_test.hdf5")

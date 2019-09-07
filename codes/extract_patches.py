@@ -23,7 +23,8 @@ def get_data_training(DRIVE_train_imgs_original,
     train_masks = load_hdf5(DRIVE_train_groudTruth) #masks always the same
     # visualize(group_images(train_imgs_original[0:20,:,:,:],5),'imgs_train')#.show()  #check original imgs train
 
-    train_imgs = my_PreProc(train_imgs_original)
+
+    train_imgs = my_PreProc(train_imgs_original) # 进行数据预处理
     train_masks = train_masks/255.
 
     train_imgs = train_imgs[:,:,9:574,:]  #cut bottom and top so now it is 565*565
@@ -50,11 +51,7 @@ def get_data_training(DRIVE_train_imgs_original,
 
 
 #Load the original data and return the extracted patches for training/testing
-def get_data_testing(DRIVE_test_imgs_original,
-                     DRIVE_test_groudTruth,
-                     Imgs_to_test,
-                     patch_height,
-                     patch_width):
+def get_data_testing(DRIVE_test_imgs_original, DRIVE_test_groudTruth, Imgs_to_test, patch_height, patch_width):
     ### test
     test_imgs_original = load_hdf5(DRIVE_test_imgs_original)
     test_masks = load_hdf5(DRIVE_test_groudTruth)
@@ -239,14 +236,14 @@ def paint_border_overlap(full_imgs, patch_h, patch_w, stride_h, stride_w):
     print("new full images shape: \n" +str(full_imgs.shape))
     return full_imgs
 
-#Divide all the full_imgs in pacthes
+#划分补丁中的所有full_imgs
 def extract_ordered_overlap(full_imgs, patch_h, patch_w,stride_h,stride_w):
     assert (len(full_imgs.shape)==4)  #4D arrays
     assert (full_imgs.shape[1]==1 or full_imgs.shape[1]==3)  #check the channel is 1 or 3
-    img_h = full_imgs.shape[2]  #height of the full image
-    img_w = full_imgs.shape[3] #width of the full image
+    img_h = full_imgs.shape[2]  #完整图像的高度
+    img_w = full_imgs.shape[3] #完整图像的宽度
     assert ((img_h-patch_h)%stride_h==0 and (img_w-patch_w)%stride_w==0)
-    N_patches_img = ((img_h-patch_h)//stride_h+1)*((img_w-patch_w)//stride_w+1)  #// --> division between integers
+    N_patches_img = ((img_h-patch_h)//stride_h+1)*((img_w-patch_w)//stride_w+1)  #// --> 整数之间的划分
     N_patches_tot = N_patches_img*full_imgs.shape[0]
     print("Number of patches on h : " +str(((img_h-patch_h)//stride_h+1)))
     print("Number of patches on w : " +str(((img_w-patch_w)//stride_w+1)))
