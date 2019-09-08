@@ -26,7 +26,7 @@ N_subimgs = 190000
 inside_FOV = False
 #Number of training epochs
 N_epochs = 5
-batch_size = 20
+batch_size = 32
 #if running with nohup
 nohup = False
 

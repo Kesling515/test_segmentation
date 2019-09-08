@@ -12,7 +12,8 @@ import numpy as np
 import configparser
 import os
 from keras.models import Model
-from keras.layers import Input, Concatenate, Conv2D, MaxPooling2D, UpSampling2D, Reshape, core, Dropout, Conv2DTranspose
+from keras import losses
+from keras.layers import Input, Concatenate, Conv2D, MaxPooling2D, UpSampling2D, Reshape, core, Dropout, Conv2DTranspose, multiply, add
 from keras.layers.merge import Concatenate
 from keras.layers.core import Activation, Flatten
 from keras.layers.normalization import BatchNormalization
@@ -51,7 +52,64 @@ patches_imgs_train, patches_masks_train = get_data_training(
     inside_FOV = config.getboolean('training settings', 'inside_FOV')
 )
 
-#Define the neural network
+
+def Attention_block(gating, x, inter_shape):
+    wg = Conv2D(inter_shape, (1, 1), padding='same', data_format='channels_first')(gating)
+    wg = BatchNormalization()(wg)
+
+    wx = Conv2D(inter_shape, (1, 1), padding='same', data_format='channels_first')(x)
+    wx = BatchNormalization()(wx)
+
+    wgx = add([wg, wx])
+    psi = Activation('relu')(wgx)
+
+    psi = Conv2D(1, (1, 1), padding='same', data_format='channels_first')(psi)
+    psi = BatchNormalization()(psi)
+    psi = Activation('sigmoid')(psi)
+
+    ab = multiply([psi, wx])
+
+    return ab
+
+"""
+def Recurrent_block(x, ch_out):
+    x1 = Conv2D(ch_out, (3, 3), padding='same', data_format='channels_first')(x)
+    x1 = BatchNormalization()(x1)
+    x1 = Activation('relu')(x1)
+
+    x2 = Conv2D(ch_out, (3, 3), padding='same', data_format='channels_first')(x + x1)
+    x2 = BatchNormalization()(x2)
+    x2 = Activation('relu')(x2)
+
+    x3 = Conv2D(ch_out, (3, 3), padding='same', data_format='channels_first')(x + x2)
+    x3 = BatchNormalization()(x3)
+    x3 = Activation('relu')(x3)
+
+    return x3
+"""
+
+"""
+def RRCNN_block(x, ch_out):
+    x1 = Conv2D(ch_out, (1, 1), padding='same', data_format='channels_first')(x)
+
+    x2 = Recurrent_block(x, ch_out)
+    x2 = Recurrent_block(x2, ch_out)
+
+    return x1 + x2
+"""
+#loss=focal_loss(gamma=2., alpha=.25)
+def focal_loss(gamma=2., alpha=.25):
+    def focal_loss_fixed(y_true, y_pred):
+        pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
+        pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
+        return -K.sum(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1))-K.sum((1-alpha) * K.pow( pt_0, gamma) * K.log(1. - pt_0))
+    return focal_loss_fixed
+
+VGG_PATH = "../test/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5"
+
+#============ 定义网络结构 ==============
+
+# Attention U-net：
 def get_unet(n_ch,patch_height,patch_width):
     inputs = Input(shape=(n_ch,patch_height,patch_width))
     # encoding path
@@ -59,54 +117,41 @@ def get_unet(n_ch,patch_height,patch_width):
     conv1 = Dropout(0.2)(conv1)
     conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv1)  # 32*48*48
     #
-    pool1 = MaxPooling2D((2, 2))(conv1)
+    pool1 = MaxPooling2D((2, 2) ,data_format='channels_first')(conv1)
     conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(pool1)
     conv2 = Dropout(0.2)(conv2)
     conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv2)  # 64*24*24
     #
-    pool2 = MaxPooling2D((2, 2))(conv2)
+    pool2 = MaxPooling2D((2, 2) ,data_format='channels_first')(conv2)
     conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first')(pool2)
     conv3 = Dropout(0.2)(conv3)
-    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv3)  # 128*12*12
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first', name='conv3')(conv3)  # 128*12*12
+
+    vgg = Model(inputs, conv3)
+    vgg.load_weights(VGG_PATH, by_name=True)
 
     # decoding + concat path
-    up1 = UpSampling2D(size=(2, 2))(conv3)  # 128*24*24
+    up1 = UpSampling2D(size=(2, 2) ,data_format='channels_first')(conv3)  # 128*24*24
     up1 = Conv2D(64, (3, 3), padding='same', data_format='channels_first')(up1)  # 64*24*24
     up1 = Dropout(0.2)(up1)
     up1 = Activation('relu')(up1)
-    wg1 = Conv2D(32, (1, 1), padding='same', data_format='channels_first')(up1)  # 32*24*24
-    wg1 = Dropout(0.2)(wg1)
-    wx1 = Conv2D(32, (1, 1), padding='same', data_format='channels_first')(conv2)  # 32*24*24
-    wx1 = Dropout(0.2)(wx1)
-    psi1 = Activation('relu')(wg1 + wx1)  # 64*24*24
-    psi1 = Conv2D(1, (1, 1), padding='same', data_format='channels_first')(psi1)  # 1*(64*24*24)
-    psi1 = Dropout(0.2)(psi1)
-    psi1 = Activation('sigmoid')(psi1)
-    ag1 = psi1 * conv2
-    up1 = Concatenate(axis=1)([ag1, up1])
+    x2 = Attention_block(up1, conv2, 32)
+    up1 = Concatenate(axis=1)([x2, up1])
     conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(up1)
     conv4 = Dropout(0.2)(conv4)
     conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv4)
     #
-    up2 = UpSampling2D(size=(2, 2))(conv4)
+    up2 = UpSampling2D(size=(2, 2) ,data_format='channels_first')(conv4)
     up2 = Conv2D(32, (3, 3), padding='same', data_format='channels_first')(up2)
     up2 = Dropout(0.2)(up2)
     up2 = Activation('relu')(up2)
-    wg2 = Conv2D(16, (1, 1), padding='same', data_format='channels_first')(up2)
-    wg2 = Dropout(0.2)(wg2)
-    wx2 = Conv2D(16, (1, 1), padding='same', data_format='channels_first')(conv1)
-    wx2 = Dropout(0.2)(wx2)
-    psi2 = Activation('relu')(wg2 + wx2)
-    psi2 = Conv2D(1, (1, 1), padding='same', data_format='channels_first')(psi2)
-    psi2 = Dropout(0.2)(psi2)
-    psi2 = Activation('sigmoid')(psi2)
-    ag2 = psi2 * conv1
-    up1 = Concatenate(axis=1)([ag2, up2])
+    x1 = Attention_block(up2, conv1, 16)
+    up1 = Concatenate(axis=1)([x1, up2])
     conv5 = Conv2D(32, (3, 3), activation='relu', padding='same', data_format='channels_first')(up2)
     conv5 = Dropout(0.2)(conv5)
-    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same', data_format='channels_first')(conv5)
+    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same', data_format='channels_first')(conv5) # 32*48*48
     #
-    conv6 = Conv2D(2, (1, 1), activation='relu',padding='same',data_format='channels_first')(conv5)
+    conv6 = Conv2D(2, (1, 1), activation='relu',padding='same',data_format='channels_first')(conv5) # 2*48*48
     conv6 = core.Reshape((2,patch_height*patch_width))(conv6)
     conv6 = core.Permute((2,1))(conv6)
     ############
@@ -115,8 +160,9 @@ def get_unet(n_ch,patch_height,patch_width):
     model = Model(inputs=inputs, outputs=conv7)
 
     #sgd = SGD(lr=0.001, decay=1e-6, momentum=0.3, nesterov=False)
-    optimizer = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+    #optimizer = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    #model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=1e-3), loss=losses.binary_crossentropy, metrics=['accuracy'])
 
     return model
 

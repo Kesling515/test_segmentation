@@ -98,8 +98,8 @@ else:
 #================ 运行补丁的预测 ==================================
 best_last = config.get('testing settings', 'best_last')
 #Load the saved model
-model = model_from_json(open(path_experiment+name_experiment +'_architecture_3.json').read())
-model.load_weights(path_experiment+name_experiment + '_'+best_last+'_weights_3.h5')
+model = model_from_json(open(path_experiment+name_experiment +'_architecture.json').read())
+model.load_weights(path_experiment+name_experiment + '_'+best_last+'_weights.h5')
 #Calculate the predictions
 predictions = model.predict(patches_imgs_test, batch_size=32, verbose=2)
 print("predicted images size :")
